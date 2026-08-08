@@ -1,23 +1,36 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-"""A2A integration namespace for optional Agent Framework connectors.
+"""DevUI integration namespace for optional Agent Framework connectors.
 
 This module lazily re-exports objects from:
-- ``agent-framework-a2a``
+- ``agent-framework-devui``
 
-Supported classes:
-- A2AAgent
-- A2AAgentSession
-- A2AServiceSessionId
-- A2AExecutor
+Supported classes and functions include:
+- DevServer
+- AgentFrameworkRequest
+- DiscoveryResponse
+- ResponseStreamEvent
+- serve
+- main
 """
 
 import importlib
 from typing import Any
 
-IMPORT_PATH = "agent_framework_a2a"
-PACKAGE_NAME = "agent-framework-a2a"
-_IMPORTS = ["A2AAgent", "A2AAgentSession", "A2AServiceSessionId", "A2AExecutor"]
+IMPORT_PATH = "agent_framework_devui"
+PACKAGE_NAME = "agent-framework-devui"
+_IMPORTS = [
+    "AgentFrameworkRequest",
+    "DevServer",
+    "DiscoveryResponse",
+    "EntityInfo",
+    "OpenAIError",
+    "OpenAIResponse",
+    "ResponseStreamEvent",
+    "main",
+    "register_cleanup",
+    "serve",
+]
 
 
 def __getattr__(name: str) -> Any:
