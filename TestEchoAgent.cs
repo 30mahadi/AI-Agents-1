@@ -10,14 +10,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
 
-namespace Microsoft.Agents.AI.Hosting.UnitTests;
+namespace Microsoft.Agents.AI.Workflows.UnitTests;
 
-/// <summary>
-/// Deterministic <see cref="AIAgent"/> used by workflow-hosting tests: it echoes each user message back as
-/// an assistant message (optionally prefixed) and supports session serialization so it can participate in
-/// checkpointed workflows.
-/// </summary>
-internal sealed class TestEchoAgent(string? id = null, string? name = null, string? prefix = null) : AIAgent
+internal class TestEchoAgent(string? id = null, string? name = null, string? prefix = null) : AIAgent
 {
     protected override string? IdCore => id;
     public override string? Name => name ?? base.Name;
@@ -49,25 +44,31 @@ internal sealed class TestEchoAgent(string? id = null, string? name = null, stri
         return message;
     }
 
-    private List<ChatMessage> EchoMessages(IEnumerable<ChatMessage> messages, AgentSession? session = null, AgentRunOptions? options = null)
+    private IEnumerable<ChatMessage> EchoMessages(IEnumerable<ChatMessage> messages, AgentSession? session = null, AgentRunOptions? options = null)
     {
-        List<ChatMessage> echoed = [];
         foreach (ChatMessage message in messages)
         {
             this.UpdateSession(message, session);
-
-            if (message.Role == ChatRole.User && !string.IsNullOrEmpty(message.Text))
-            {
-                echoed.Add(this.UpdateSession(new ChatMessage(ChatRole.Assistant, $"{prefix}{message.Text}")
-                {
-                    AuthorName = this.Name ?? this.Id,
-                    CreatedAt = DateTimeOffset.Now,
-                    MessageId = Guid.NewGuid().ToString("N")
-                }, session));
-            }
         }
 
-        return echoed;
+        IEnumerable<ChatMessage> echoMessages
+            = from message in messages
+              where message.Role == ChatRole.User &&
+                    !string.IsNullOrEmpty(message.Text)
+              select
+                    this.UpdateSession(new ChatMessage(ChatRole.Assistant, $"{prefix}{message.Text}")
+                    {
+                        AuthorName = this.Name ?? this.Id,
+                        CreatedAt = DateTimeOffset.Now,
+                        MessageId = Guid.NewGuid().ToString("N")
+                    }, session);
+
+        return echoMessages.Concat(this.GetEpilogueMessages(options).Select(m => this.UpdateSession(m, session)));
+    }
+
+    protected virtual IEnumerable<ChatMessage> GetEpilogueMessages(AgentRunOptions? options = null)
+    {
+        return [];
     }
 
     protected override Task<AgentResponse> RunCoreAsync(IEnumerable<ChatMessage> messages, AgentSession? session = null, AgentRunOptions? options = null, CancellationToken cancellationToken = default)
@@ -99,8 +100,6 @@ internal sealed class TestEchoAgent(string? id = null, string? name = null, stri
                     CreatedAt = message.CreatedAt
                 };
         }
-
-        await Task.CompletedTask;
     }
 
     private sealed class EchoAgentSession : AgentSession
