@@ -1,191 +1,130 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
-using System.Threading.Tasks;
-using Azure.AI.Projects;
-using Azure.AI.Projects.Memory;
-using Azure.Identity;
-using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Foundry;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Configuration;
-using OpenAI.Responses;
-using Shared.IntegrationTests;
 
-namespace Foundry.IntegrationTests.Memory;
+namespace Microsoft.Agents.AI.Foundry.UnitTests.Memory;
 
 /// <summary>
-/// Integration tests for <see cref="FoundryMemoryProvider"/> against a configured Microsoft Foundry Memory service.
+/// Tests for <see cref="FoundryMemoryProvider"/> constructor validation.
 /// </summary>
 /// <remarks>
-/// These integration tests are skipped by default and require a live Microsoft Foundry Memory service.
-/// The tests need to be updated to use the new AIAgent-based API pattern.
+/// Since <see cref="FoundryMemoryProvider"/> directly uses <see cref="Azure.AI.Projects.AIProjectClient"/>,
+/// integration tests are used to verify the memory operations. These unit tests focus on:
+/// - Constructor parameter validation
+/// - State initializer validation
 /// </remarks>
-public sealed class FoundryMemoryProviderTests : IDisposable
+public sealed class FoundryMemoryProviderTests
 {
-    private const string SkipReason = "Requires a Microsoft Foundry Memory service configured"; // Set to null to enable.
-
-    private readonly AIProjectClient? _client;
-    private readonly string? _memoryStoreName;
-    private readonly string? _deploymentName;
-    private readonly string? _embeddingDeploymentName;
-    private bool _disposed;
-
-    public FoundryMemoryProviderTests()
+    [Fact]
+    public void Constructor_Throws_WhenClientIsNull()
     {
-        IConfigurationRoot configuration = new ConfigurationBuilder()
-            .AddJsonFile(path: "testsettings.development.json", optional: true, reloadOnChange: true)
-            .AddEnvironmentVariables()
-            .AddUserSecrets<FoundryMemoryProviderTests>(optional: true)
-            .Build();
-
-        var endpoint = configuration[TestSettings.AzureAIProjectEndpoint];
-        var memoryStoreName = configuration[TestSettings.AzureAIMemoryStoreId];
-        var deploymentName = configuration[TestSettings.AzureAIModelDeploymentName];
-        var embeddingDeploymentName = configuration[TestSettings.AzureAIEmbeddingDeploymentName];
-
-        if (!string.IsNullOrWhiteSpace(endpoint) &&
-            !string.IsNullOrWhiteSpace(memoryStoreName))
-        {
-            this._client = new AIProjectClient(new Uri(endpoint), new DefaultAzureCredential());
-            this._memoryStoreName = memoryStoreName;
-            this._deploymentName = deploymentName ?? "gpt-4.1-mini";
-            this._embeddingDeploymentName = embeddingDeploymentName ?? "text-embedding-ada-002";
-        }
+        // Act & Assert
+        ArgumentNullException ex = Assert.Throws<ArgumentNullException>(() => new FoundryMemoryProvider(
+            null!,
+            "store",
+            stateInitializer: _ => new(new FoundryMemoryProviderScope("test"))));
+        Assert.Equal("client", ex.ParamName);
     }
 
-    [Fact(Skip = SkipReason)]
-    public async Task CanAddAndRetrieveUserMemoriesAsync()
+    [Fact]
+    public void Constructor_Throws_WhenStateInitializerIsNull()
     {
         // Arrange
-        FoundryMemoryProvider memoryProvider = new(
-            this._client!,
-            this._memoryStoreName!,
-            stateInitializer: _ => new(new FoundryMemoryProviderScope("it-user-1")));
+        using TestableAIProjectClient testClient = new();
 
-        await memoryProvider.EnsureMemoryStoreCreatedAsync(this._deploymentName!, this._embeddingDeploymentName!);
+        // Act & Assert
+        ArgumentNullException ex = Assert.Throws<ArgumentNullException>(() => new FoundryMemoryProvider(
+            testClient.Client,
+            "store",
+            stateInitializer: null!));
+        Assert.Equal("stateInitializer", ex.ParamName);
+    }
 
-        AIAgent agent = this._client!.AsAIAgent(new ChatClientAgentOptions
+    [Fact]
+    public void Constructor_Throws_WhenMemoryStoreNameIsEmpty()
+    {
+        // Arrange
+        using TestableAIProjectClient testClient = new();
+
+        // Act & Assert
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => new FoundryMemoryProvider(
+            testClient.Client,
+            "",
+            stateInitializer: _ => new(new FoundryMemoryProviderScope("test"))));
+        Assert.Equal("memoryStoreName", ex.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_Throws_WhenMemoryStoreNameIsNull()
+    {
+        // Arrange
+        using TestableAIProjectClient testClient = new();
+
+        // Act & Assert
+        ArgumentNullException ex = Assert.Throws<ArgumentNullException>(() => new FoundryMemoryProvider(
+            testClient.Client,
+            null!,
+            stateInitializer: _ => new(new FoundryMemoryProviderScope("test"))));
+        Assert.Equal("memoryStoreName", ex.ParamName);
+    }
+
+    [Fact]
+    public void Scope_Throws_WhenScopeIsNull()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => new FoundryMemoryProviderScope(null!));
+    }
+
+    [Fact]
+    public void Scope_Throws_WhenScopeIsEmpty()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => new FoundryMemoryProviderScope(""));
+    }
+
+    [Fact]
+    public void StateInitializer_Throws_WhenScopeIsNull()
+    {
+        // Arrange
+        using TestableAIProjectClient testClient = new();
+        FoundryMemoryProvider sut = new(
+            testClient.Client,
+            "store",
+            stateInitializer: _ => new(null!));
+
+        // Act & Assert - state initializer validation is deferred to first use
+        Assert.Throws<ArgumentNullException>(() =>
         {
-            ChatOptions = new ChatOptions
+            // Force state initialization by creating a session-like scenario
+            // The validation happens inside the ValidateStateInitializer wrapper
+            try
             {
-                ModelId = this._deploymentName!,
-                Instructions = "You are a helpful assistant. Use known memories about the user when responding, and do not invent details."
-            },
-            AIContextProviders = [memoryProvider]
+                // The stateInitializer wraps with validation, so calling it will throw
+                var field = typeof(FoundryMemoryProvider).GetField("_sessionState", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var sessionState = field!.GetValue(sut);
+                var method = sessionState!.GetType().GetMethod("GetOrInitializeState");
+                method!.Invoke(sessionState, [null]);
+            }
+            catch (System.Reflection.TargetInvocationException tie) when (tie.InnerException is not null)
+            {
+                throw tie.InnerException;
+            }
         });
+    }
 
-        AgentSession session = await agent.CreateSessionAsync();
-
-        await memoryProvider.EnsureStoredMemoriesDeletedAsync(session);
+    [Fact]
+    public void Constructor_Succeeds_WithValidParameters()
+    {
+        // Arrange
+        using TestableAIProjectClient testClient = new();
 
         // Act
-        AgentResponse resultBefore = await agent.RunAsync("What is my name?", session);
-        Assert.DoesNotContain("Caoimhe", resultBefore.Text);
-
-        await agent.RunAsync("Hello, my name is Caoimhe.", session);
-        await memoryProvider.WhenUpdatesCompletedAsync();
-        await Task.Delay(2000);
-
-        // Assert - verify memories were actually created in the store before querying via agent
-        var searchResult = await this._client!.MemoryStores.SearchMemoriesAsync(
-            this._memoryStoreName!,
-            new MemorySearchOptions("it-user-1")
-            {
-                Items = { ResponseItem.CreateUserMessageItem("Caoimhe") }
-            });
-        Assert.NotEmpty(searchResult.Value.Memories);
-
-        AgentResponse resultAfter = await agent.RunAsync("What is my name?", session);
-
-        // Cleanup
-        await memoryProvider.EnsureStoredMemoriesDeletedAsync(session);
+        FoundryMemoryProvider sut = new(
+            testClient.Client,
+            "my-store",
+            stateInitializer: _ => new(new FoundryMemoryProviderScope("user-456")));
 
         // Assert
-        Assert.Contains("Caoimhe", resultAfter.Text);
-    }
-
-    [Fact(Skip = SkipReason)]
-    public async Task DoesNotLeakMemoriesAcrossScopesAsync()
-    {
-        // Arrange
-        FoundryMemoryProvider memoryProvider1 = new(
-            this._client!,
-            this._memoryStoreName!,
-            stateInitializer: _ => new(new FoundryMemoryProviderScope("it-scope-a")));
-
-        FoundryMemoryProvider memoryProvider2 = new(
-            this._client!,
-            this._memoryStoreName!,
-            stateInitializer: _ => new(new FoundryMemoryProviderScope("it-scope-b")));
-
-        await memoryProvider1.EnsureMemoryStoreCreatedAsync(this._deploymentName!, this._embeddingDeploymentName!);
-
-        AIAgent agent1 = this._client!.AsAIAgent(new ChatClientAgentOptions
-        {
-            ChatOptions = new ChatOptions
-            {
-                ModelId = this._deploymentName!,
-                Instructions = "You are a helpful assistant. Use known memories about the user when responding, and do not invent details."
-            },
-            AIContextProviders = [memoryProvider1]
-        });
-
-        AIAgent agent2 = this._client!.AsAIAgent(new ChatClientAgentOptions
-        {
-            ChatOptions = new ChatOptions
-            {
-                ModelId = this._deploymentName!,
-                Instructions = "You are a helpful assistant. Use known memories about the user when responding, and do not invent details."
-            },
-            AIContextProviders = [memoryProvider2]
-        });
-
-        AgentSession session1 = await agent1.CreateSessionAsync();
-        AgentSession session2 = await agent2.CreateSessionAsync();
-
-        await memoryProvider1.EnsureStoredMemoriesDeletedAsync(session1);
-        await memoryProvider2.EnsureStoredMemoriesDeletedAsync(session2);
-
-        // Act - add memory only to scope A
-        await agent1.RunAsync("Hello, I'm an AI tutor and my name is Caoimhe.", session1);
-        await memoryProvider1.WhenUpdatesCompletedAsync();
-        await Task.Delay(2000);
-
-        // Assert - verify memories were created in scope A but not in scope B
-        var searchResultA = await this._client!.MemoryStores.SearchMemoriesAsync(
-            this._memoryStoreName!,
-            new MemorySearchOptions("it-scope-a")
-            {
-                Items = { ResponseItem.CreateUserMessageItem("Caoimhe") }
-            });
-        Assert.NotEmpty(searchResultA.Value.Memories);
-
-        var searchResultB = await this._client.MemoryStores.SearchMemoriesAsync(
-            this._memoryStoreName!,
-            new MemorySearchOptions("it-scope-b")
-            {
-                Items = { ResponseItem.CreateUserMessageItem("Caoimhe") }
-            });
-        Assert.Empty(searchResultB.Value.Memories);
-
-        AgentResponse result1 = await agent1.RunAsync("What is my name?", session1);
-        AgentResponse result2 = await agent2.RunAsync("What is my name?", session2);
-
-        // Assert
-        Assert.Contains("Caoimhe", result1.Text);
-        Assert.DoesNotContain("Caoimhe", result2.Text);
-
-        // Cleanup
-        await memoryProvider1.EnsureStoredMemoriesDeletedAsync(session1);
-        await memoryProvider2.EnsureStoredMemoriesDeletedAsync(session2);
-    }
-
-    public void Dispose()
-    {
-        if (!this._disposed)
-        {
-            this._disposed = true;
-        }
+        Assert.NotNull(sut);
     }
 }
