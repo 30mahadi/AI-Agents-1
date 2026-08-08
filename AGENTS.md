@@ -1,71 +1,71 @@
-# AGENTS.md
+# AGENTS.md — azure-contentunderstanding
 
-Instructions for AI coding agents working in the .NET codebase.
+## Package Overview
 
-## Build, Test, and Lint Commands
+`agent-framework-azure-contentunderstanding` integrates Azure Content Understanding (CU)
+into the Agent Framework as a context provider. It automatically analyzes file attachments
+(documents, images, audio, video) and injects structured results into the LLM context.
 
-See `./.github/skills/build-and-test/SKILL.md` for detailed instructions on building, testing, and linting projects.
+## Public API
 
-## Project Structure
+| Symbol | Type | Description |
+|--------|------|-------------|
+| `ContentUnderstandingContextProvider` | class | Main context provider — extends `ContextProvider` |
+| `AnalysisSection` | enum | Output section selector (MARKDOWN, FIELDS, etc.) |
+| `DocumentStatus` | enum | Document lifecycle state (ANALYZING, UPLOADING, READY, FAILED) |
+| `FileSearchBackend` | ABC | Abstract vector store file operations interface |
+| `FileSearchConfig` | dataclass | Configuration for CU + vector store RAG mode |
 
-See `./.github/skills/project-structure/SKILL.md` for an overview of the project structure.
+## Architecture
 
-## Pull Requests
+- **`_context_provider.py`** — Main provider implementation. Overrides `before_run()` to detect
+  file attachments, call the CU API, manage session state with multi-document tracking,
+  and auto-register retrieval tools for follow-up turns.
+  - **Analyzer auto-detection** — When `analyzer_id=None` (default), `_resolve_analyzer_id()`
+    selects the CU analyzer based on media type prefix: `audio/` → `prebuilt-audioSearch`,
+    `video/` → `prebuilt-videoSearch`, everything else → `prebuilt-documentSearch`.
+  - **Multi-segment output** — CU splits long video/audio into multiple scene segments
+    (each a separate `contents[]` entry with its own `startTimeMs`, `endTimeMs`, `markdown`,
+    and `fields`). `_extract_sections()` produces:
+    - `segments`: list of per-segment dicts, each with `markdown`, `fields`, `start_time_s`, `end_time_s`
+    - `markdown`: concatenated at top level with `---` separators (for file_search uploads)
+    - `duration_seconds`: computed from global `min(startTimeMs)` → `max(endTimeMs)`
+    - Metadata (`kind`, `resolution`): taken from the first segment
+  - **Speaker diarization (not identification)** — CU transcripts label speakers as
+    `<Speaker 1>`, `<Speaker 2>`, etc. CU does **not** identify speakers by name.
+  - **file_search RAG** — When `FileSearchConfig` is provided, CU-extracted markdown is
+    uploaded to an OpenAI vector store and a `file_search` tool is registered on the context
+    instead of injecting the full document content. This enables token-efficient retrieval
+    for large documents.
+- **`_models.py`** — `AnalysisSection` enum, `DocumentStatus` enum, `DocumentEntry` TypedDict,
+  `FileSearchConfig` dataclass.
+- **`_file_search.py`** — `FileSearchBackend` ABC, `OpenAIFileSearchBackend`,
+  `FoundryFileSearchBackend`.
 
-See `./.github/skills/pull-requests/SKILL.md` for guidance on writing PR descriptions and handling/resolving PR review comments.
+## Key Patterns
 
-### Core types
+- Follows the Azure AI Search context provider pattern (same lifecycle, config style).
+- Uses provider-scoped `state` dict for multi-document tracking across turns.
+- Auto-registers `list_documents()` tool via `context.extend_tools()`.
+- Configurable timeout (`max_wait`) with `asyncio.create_task()` background fallback.
+- Strips supported binary attachments from `input_messages` to prevent LLM API errors.
+- Explicit `analyzer_id` always overrides auto-detection (user preference wins).
+- Vector store resources are cleaned up in `close()` / `__aexit__`.
 
-- `AIAgent`: The abstract base class that all agents derive from, providing common methods for interacting with an agent.
-- `AgentSession`: The abstract base class that all agent sessions derive from, representing a conversation with an agent.
-- `ChatClientAgent`: An `AIAgent` implementation that uses an `IChatClient` to send messages to an AI provider and receive responses.
-- `IChatClient`: Interface for sending messages to an AI provider and receiving responses. Used by `ChatClientAgent` and implemented by provider-specific packages.
-- `FunctionInvokingChatClient`: Decorator for `IChatClient` that adds function invocation capabilities.
-- `AITool`: Represents a tool that an agent/AI provider can use, with metadata and an execution delegate.
-- `AIFunction`: A specific type of `AITool` that represents a local function the agent/AI provider can call, with parameters and return types defined.
-- `ChatMessage`: Represents a message in a conversation.
-- `AIContent`: Represents content in a message, which can be text, a function call, tool output and more.
+## Samples
 
-### External Dependencies
+| Sample | Description |
+|--------|-------------|
+| `samples/02-agents/context_providers/azure_content_understanding/01_document_qa.py` | Upload a PDF via URL, ask questions about it |
+| `samples/02-agents/context_providers/azure_content_understanding/02_multi_turn_session.py` | AgentSession persistence across turns |
+| `samples/02-agents/context_providers/azure_content_understanding/03_multimodal_chat.py` | PDF + audio + video parallel analysis |
+| `samples/02-agents/context_providers/azure_content_understanding/04_invoice_processing.py` | Structured field extraction with `prebuilt-invoice` analyzer |
+| `samples/02-agents/context_providers/azure_content_understanding/05_large_doc_file_search.py` | CU extraction + OpenAI vector store RAG |
+| `samples/02-agents/devui/agent_content_understanding/` | DevUI web UI for CU-powered chat |
+| `samples/02-agents/devui/agent_content_understanding_file_search_*/` | DevUI web UI combining CU + file_search RAG |
 
-The framework integrates with `Microsoft.Extensions.AI` and `Microsoft.Extensions.AI.Abstractions` (external NuGet packages)
-using types like `IChatClient`, `FunctionInvokingChatClient`, `AITool`, `AIFunction`, `ChatMessage`, and `AIContent`.
+## Running Tests
 
-## Key Conventions
-
-- **Command output capture**: When running `dotnet build`, `dotnet test`, `dotnet format`, or similar commands, redirect output to a temp file first (e.g., `dotnet build --tl:off 2>&1 | Out-File $env:TEMP\build.log`), then analyze the file as needed. This avoids re-running expensive commands when the initial analysis misses something.
-- **Encoding**: All new files must be saved with UTF-8 encoding with BOM (Byte Order Mark). This is required for `dotnet format` to work correctly. When using PowerShell `Set-Content`, always pass `-Encoding UTF8BOM` to preserve the BOM (e.g., `Set-Content $file $content -NoNewline -Encoding UTF8BOM`).
-- **Copyright header**: `// Copyright (c) Microsoft. All rights reserved.` at top of all `.cs` files
-- **XML docs**: Required for all public methods and classes
-- **Async**: Use `Async` suffix for methods returning `Task`/`ValueTask`
-- **Private classes**: Should be `sealed` unless subclassed
-- **Config**: Read from environment variables with `UPPER_SNAKE_CASE` naming
-- **Tests**: Add Arrange/Act/Assert comments; use Moq for mocking; test methods returning `Task`/`ValueTask` must use the `Async` suffix.
-
-## Key Design Principles
-
-When developing or reviewing code, verify adherence to these key design principles:
-
-- **DRY**: Avoid code duplication by moving common logic into helper methods or helper classes.
-- **Single Responsibility**: Each class should have one clear responsibility.
-- **Encapsulation**: Keep implementation details private and expose only necessary public APIs.
-- **Strong Typing**: Use strong typing to ensure that code is self-documenting and to catch errors at compile time.
-
-## Sample Structure
-
-Samples (in `./samples/` folder) should follow this structure:
-
-1. Copyright header: `// Copyright (c) Microsoft. All rights reserved.`
-2. Description comment explaining what the sample demonstrates
-3. Using statements
-4. Main code logic
-5. Helper methods at bottom
-
-Configuration via environment variables (never hardcode secrets). Keep samples simple and focused.
-
-When adding a new sample:
-
-- Create a standalone project in `samples/` with matching directory and project names
-- Include a README.md explaining what the sample does and how to run it
-- Add the project to the solution file
-- Reference the sample in the parent directory's README.md
+```bash
+uv run poe test -P azure-contentunderstanding
+```
