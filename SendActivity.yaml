@@ -2,24 +2,15 @@ kind: Workflow
 trigger:
 
   kind: OnConversationStart
-  id: workflow_test
+  id: my_workflow
   actions:
-
-    # Capture input
+  
     - kind: SetVariable
-      id: set_user_input
-      variable: Local.UserInput
-      value: =System.LastMessage.Text
+      id: set_input
+      variable: Local.TestValue
+      value: =System.LastMessageText
 
-    # Capture environment variable
-    - kind: SetVariable
-      id: set_user_name
-      variable: Global.UserName
-      value: TestAgent
-
-    # Respond with input
     - kind: SendActivity
-      id: send_result
+      id: activity_input
       activity: |-
-        Hello {Global.UserName},
-        You said, "{Local.UserInput}"
+        Input: "{Local.TestValue}"
