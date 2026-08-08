@@ -7,8 +7,10 @@ trigger:
 
     - kind: InvokeAzureAgent
       id: invoke_agent
-      conversationId: =System.ConversationId
       agent:
-        name: =Env.MY_STUDENT
+        name: TestAgent
       input:
         messages: =[UserMessage(System.LastMessageText)]
+      output:
+        autoSend: false
+        messages: Local.AgentResponse

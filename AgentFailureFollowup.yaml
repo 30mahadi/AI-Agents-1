@@ -9,6 +9,12 @@ trigger:
       id: invoke_agent
       conversationId: =System.ConversationId
       agent:
-        name: =Env.MY_STUDENT
+        name: TestAgent
       input:
         messages: =[UserMessage(System.LastMessageText)]
+      output:
+        messages: Local.AgentResponse
+
+    - kind: SendActivity
+      id: after_agent
+      activity: AFTER_AGENT
