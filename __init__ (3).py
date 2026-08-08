@@ -1,35 +1,71 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-"""DevUI integration namespace for optional Agent Framework connectors.
+"""Orchestrations integration namespace for optional Agent Framework connectors.
 
 This module lazily re-exports objects from:
-- ``agent-framework-devui``
+- ``agent-framework-orchestrations``
 
-Supported classes and functions include:
-- DevServer
-- AgentFrameworkRequest
-- DiscoveryResponse
-- ResponseStreamEvent
-- serve
-- main
+Supported classes include:
+- SequentialBuilder
+- ConcurrentBuilder
+- GroupChatBuilder
+- MagenticBuilder
+- HandoffBuilder
 """
 
 import importlib
 from typing import Any
 
-IMPORT_PATH = "agent_framework_devui"
-PACKAGE_NAME = "agent-framework-devui"
+IMPORT_PATH = "agent_framework_orchestrations"
+PACKAGE_NAME = "agent-framework-orchestrations"
 _IMPORTS = [
-    "AgentFrameworkRequest",
-    "DevServer",
-    "DiscoveryResponse",
-    "EntityInfo",
-    "OpenAIError",
-    "OpenAIResponse",
-    "ResponseStreamEvent",
-    "main",
-    "register_cleanup",
-    "serve",
+    # Sequential
+    "SequentialBuilder",
+    # Concurrent
+    "ConcurrentBuilder",
+    # Handoff
+    "HandoffAgentExecutor",
+    "HandoffAgentUserRequest",
+    "HandoffBuilder",
+    "HandoffConfiguration",
+    "HandoffSentEvent",
+    # Base orchestrator
+    "BaseGroupChatOrchestrator",
+    "GroupChatRequestMessage",
+    "GroupChatRequestSentEvent",
+    "GroupChatResponseReceivedEvent",
+    "TerminationCondition",
+    # Orchestration helpers
+    "AgentRequestInfoResponse",
+    "OrchestrationState",
+    "clean_conversation_for_handoff",
+    "create_completion_message",
+    # Group Chat
+    "AgentBasedGroupChatOrchestrator",
+    "AgentOrchestrationOutput",
+    "GroupChatBuilder",
+    "GroupChatOrchestrator",
+    "GroupChatSelectionFunction",
+    "GroupChatState",
+    # Magentic
+    "MAGENTIC_MANAGER_NAME",
+    "ORCH_MSG_KIND_INSTRUCTION",
+    "ORCH_MSG_KIND_NOTICE",
+    "ORCH_MSG_KIND_TASK_LEDGER",
+    "ORCH_MSG_KIND_USER_TASK",
+    "MagenticAgentExecutor",
+    "MagenticBuilder",
+    "MagenticContext",
+    "MagenticManagerBase",
+    "MagenticOrchestrator",
+    "MagenticOrchestratorEvent",
+    "MagenticOrchestratorEventType",
+    "MagenticPlanReviewRequest",
+    "MagenticPlanReviewResponse",
+    "MagenticProgressLedger",
+    "MagenticProgressLedgerItem",
+    "MagenticResetSignal",
+    "StandardMagenticManager",
 ]
 
 

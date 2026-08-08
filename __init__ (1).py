@@ -1,59 +1,49 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-"""Declarative integration namespace for optional Agent Framework connectors.
+"""OpenAI namespace for Agent Framework clients.
 
-This module lazily re-exports objects from:
-- ``agent-framework-declarative``
+This module lazily re-exports objects from the ``agent-framework-openai`` package.
+Install it with: ``pip install agent-framework-openai``
 
 Supported classes include:
-- AgentFactory
-- WorkflowFactory
-- ExternalInputRequest
-- ExternalInputResponse
+- OpenAIChatClient (Responses API)
+- OpenAIChatCompletionClient (Chat Completions API)
+- OpenAIEmbeddingClient
 """
 
 import importlib
 from typing import Any
 
-IMPORT_PATH = "agent_framework_declarative"
-PACKAGE_NAME = "agent-framework-declarative"
-_IMPORTS = [
-    "AgentFactory",
-    "AgentExternalInputRequest",
-    "AgentExternalInputResponse",
-    "DeclarativeActionError",
-    "DeclarativeLoaderError",
-    "DeclarativeWorkflowError",
-    "DefaultHttpRequestHandler",
-    "DefaultMCPToolHandler",
-    "ExternalInputRequest",
-    "ExternalInputResponse",
-    "HttpRequestHandler",
-    "HttpRequestInfo",
-    "HttpRequestResult",
-    "MCPToolApprovalRequest",
-    "MCPToolHandler",
-    "MCPToolInvocation",
-    "MCPToolResult",
-    "ProviderLookupError",
-    "ProviderTypeMapping",
-    "ToolApprovalRequest",
-    "ToolApprovalResponse",
-    "WorkflowFactory",
-    "WorkflowState",
-]
+_IMPORTS: dict[str, tuple[str, str]] = {
+    "OpenAIChatClient": ("agent_framework_openai", "agent-framework-openai"),
+    "OpenAIChatOptions": ("agent_framework_openai", "agent-framework-openai"),
+    "OpenAIContinuationToken": ("agent_framework_openai", "agent-framework-openai"),
+    "RawOpenAIChatClient": ("agent_framework_openai", "agent-framework-openai"),
+    "OpenAIChatCompletionClient": ("agent_framework_openai", "agent-framework-openai"),
+    "OpenAIChatCompletionOptions": ("agent_framework_openai", "agent-framework-openai"),
+    "OpenAIChatMessagePreparer": ("agent_framework_openai", "agent-framework-openai"),
+    "OpenAIChatResponseContentsParser": ("agent_framework_openai", "agent-framework-openai"),
+    "RawOpenAIChatCompletionClient": ("agent_framework_openai", "agent-framework-openai"),
+    "OpenAIEmbeddingClient": ("agent_framework_openai", "agent-framework-openai"),
+    "OpenAIEmbeddingOptions": ("agent_framework_openai", "agent-framework-openai"),
+    "OpenAISettings": ("agent_framework_openai", "agent-framework-openai"),
+    "ContentFilterResultSeverity": ("agent_framework_openai", "agent-framework-openai"),
+    "OpenAIContentFilterException": ("agent_framework_openai", "agent-framework-openai"),
+}
 
 
 def __getattr__(name: str) -> Any:
     if name in _IMPORTS:
+        import_path, package_name = _IMPORTS[name]
         try:
-            return getattr(importlib.import_module(IMPORT_PATH), name)
+            return getattr(importlib.import_module(import_path), name)
         except ModuleNotFoundError as exc:
             raise ModuleNotFoundError(
-                f"The '{PACKAGE_NAME}' package is not installed, please do `pip install {PACKAGE_NAME}`"
+                f"The package {package_name} is required to use `{name}`. "
+                f"Please use `pip install {package_name}`, or update your requirements.txt or pyproject.toml file."
             ) from exc
-    raise AttributeError(f"Module {IMPORT_PATH} has no attribute {name}.")
+    raise AttributeError(f"Module `openai` has no attribute {name}.")
 
 
 def __dir__() -> list[str]:
-    return _IMPORTS
+    return list(_IMPORTS.keys())
