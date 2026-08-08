@@ -1,25 +1,92 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
+using Microsoft.Extensions.AI;
 
-namespace AgentConformance.IntegrationTests;
+namespace Microsoft.Agents.AI.Workflows.Declarative.IntegrationTests.Agents;
 
-#pragma warning disable CA1812 // Avoid uninstantiated internal classes
+#pragma warning disable CA1822
 
-/// <summary>
-/// A test plugin used to verify function invocation.
-/// </summary>
-internal static class MenuPlugin
+public sealed class MenuPlugin
 {
+    public IEnumerable<AIFunction> GetTools()
+    {
+        yield return AIFunctionFactory.Create(this.GetMenu);
+        yield return AIFunctionFactory.Create(this.GetSpecials);
+        yield return AIFunctionFactory.Create(this.GetItemPrice);
+    }
+
+    [Description("Provides a list items on the menu.")]
+    public MenuItem[] GetMenu()
+    {
+        return s_menuItems;
+    }
+
     [Description("Provides a list of specials from the menu.")]
-    public static string GetSpecials() => """
-        Special Soup: Clam Chowder
-        Special Salad: Cobb Salad
-        Special Drink: Chai Tea
-        """;
+    public MenuItem[] GetSpecials()
+    {
+        return [.. s_menuItems.Where(i => i.IsSpecial)];
+    }
 
     [Description("Provides the price of the requested menu item.")]
-    public static string GetItemPrice(
+    public float? GetItemPrice(
         [Description("The name of the menu item.")]
-        string menuItem) => "$9.99";
+        string name)
+    {
+        return s_menuItems.FirstOrDefault(i => i.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Price;
+    }
+
+    private static readonly MenuItem[] s_menuItems =
+        [
+            new()
+            {
+                Category = "Soup",
+                Name = "Clam Chowder",
+                Price = 4.95f,
+                IsSpecial = true,
+            },
+            new()
+            {
+                Category = "Soup",
+                Name = "Tomato Soup",
+                Price = 4.95f,
+                IsSpecial = false,
+            },
+            new()
+            {
+                Category = "Salad",
+                Name = "Cobb Salad",
+                Price = 9.99f,
+            },
+            new()
+            {
+                Category = "Salad",
+                Name = "House Salad",
+                Price = 4.95f,
+            },
+            new()
+            {
+                Category = "Drink",
+                Name = "Chai Tea",
+                Price = 2.95f,
+                IsSpecial = true,
+            },
+            new()
+            {
+                Category = "Drink",
+                Name = "Soda",
+                Price = 1.95f,
+            },
+        ];
+
+    public sealed class MenuItem
+    {
+        public string Category { get; init; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
+        public float Price { get; init; }
+        public bool IsSpecial { get; init; }
+    }
 }
