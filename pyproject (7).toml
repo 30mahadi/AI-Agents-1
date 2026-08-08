@@ -1,6 +1,6 @@
 [project]
-name = "agent-framework-copilotstudio"
-description = "Copilot Studio integration for Microsoft Agent Framework."
+name = "agent-framework-claude"
+description = "Claude Agent SDK integration for Microsoft Agent Framework."
 authors = [{ name = "Microsoft", email = "af-support@microsoft.com"}]
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,7 +24,7 @@ classifiers = [
 ]
 dependencies = [
     "agent-framework-core>=1.13.0,<2",
-    "microsoft-agents-copilotstudio-client>=1.2.0,<2",
+    "claude-agent-sdk>=0.1.46,<0.3",
 ]
 
 [tool.uv]
@@ -61,7 +61,8 @@ omit = [
 
 [tool.pyright]
 extends = "../../pyproject.toml"
-include = ["agent_framework_copilotstudio"]
+include = ["agent_framework_claude"]
+exclude = ['tests']
 
 [tool.mypy]
 plugins = ['pydantic.mypy']
@@ -78,7 +79,7 @@ disallow_incomplete_defs = true
 disallow_untyped_decorators = true
 
 [tool.bandit]
-targets = ["agent_framework_copilotstudio"]
+targets = ["agent_framework_claude"]
 exclude_dirs = ["tests"]
 
 [tool.poe]
@@ -87,11 +88,11 @@ include = "../../shared_tasks.toml"
 
 [tool.poe.tasks.mypy]
 help = "Run MyPy for this package."
-cmd = "mypy --config-file $POE_ROOT/pyproject.toml agent_framework_copilotstudio"
+cmd = "mypy --config-file $POE_ROOT/pyproject.toml agent_framework_claude"
 
 [tool.poe.tasks.test]
 help = "Run the default unit test suite for this package."
-cmd = 'pytest -m "not integration" --cov=agent_framework_copilotstudio --cov-report=term-missing:skip-covered tests'
+cmd = 'pytest -m "not integration" --cov=agent_framework_claude --cov-report=term-missing:skip-covered tests'
 
 [build-system]
 requires = ["flit-core >= 3.11,<4.0"]

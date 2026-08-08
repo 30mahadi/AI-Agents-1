@@ -4,6 +4,6 @@ from enum import IntEnum
 
 
 class FeatureIndex(IntEnum):
-    """Copilot Studio-owned feature-usage indexes."""
+    """Claude Agent SDK-owned feature-usage indexes."""
 
-    COPILOTSTUDIO = 63
+    CLAUDE = 62

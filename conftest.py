@@ -1,106 +1,91 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-from __future__ import annotations
-
-import asyncio
-import json
-from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
-from azure.ai.contentunderstanding.models import AnalysisResult
-
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
-
-
-def _load_fixture(name: str) -> dict[str, Any]:
-    return json.loads((FIXTURES_DIR / name).read_text())  # type: ignore[no-any-return]
+from microsoft_agents.copilotstudio.client import CopilotClient
 
 
 @pytest.fixture
-def pdf_fixture_raw() -> dict[str, Any]:
-    return _load_fixture("analyze_pdf_result.json")
+def exclude_list(request: Any) -> list[str]:
+    """Fixture that returns a list of environment variables to exclude."""
+    return request.param if hasattr(request, "param") else []
 
 
 @pytest.fixture
-def pdf_analysis_result(pdf_fixture_raw: dict[str, Any]) -> AnalysisResult:
-    return AnalysisResult(pdf_fixture_raw)
+def override_env_param_dict(request: Any) -> dict[str, str]:
+    """Fixture that returns a dict of environment variables to override."""
+    return request.param if hasattr(request, "param") else {}
+
+
+@pytest.fixture()
+def copilot_studio_unit_test_env(monkeypatch, exclude_list, override_env_param_dict):  # type: ignore
+    """Fixture to set environment variables for CopilotStudioSettings."""
+
+    if exclude_list is None:
+        exclude_list = []
+
+    if override_env_param_dict is None:
+        override_env_param_dict = {}
+
+    env_vars = {
+        "COPILOTSTUDIOAGENT__ENVIRONMENTID": "test-environment-id",
+        "COPILOTSTUDIOAGENT__SCHEMANAME": "test-schema-name",
+        "COPILOTSTUDIOAGENT__AGENTAPPID": "test-client-id",
+        "COPILOTSTUDIOAGENT__TENANTID": "test-tenant-id",
+    }
+
+    env_vars.update(override_env_param_dict)  # type: ignore
+
+    for key, value in env_vars.items():
+        if key in exclude_list:
+            monkeypatch.delenv(key, raising=False)  # type: ignore
+            continue
+        monkeypatch.setenv(key, value)  # type: ignore
+
+    return env_vars
 
 
 @pytest.fixture
-def audio_fixture_raw() -> dict[str, Any]:
-    return _load_fixture("analyze_audio_result.json")
+def mock_copilot_client() -> MagicMock:
+    """Mock CopilotClient for testing."""
+    return MagicMock(spec=CopilotClient)
 
 
 @pytest.fixture
-def audio_analysis_result(audio_fixture_raw: dict[str, Any]) -> AnalysisResult:
-    return AnalysisResult(audio_fixture_raw)
+def mock_pca() -> MagicMock:
+    """Mock PublicClientApplication for testing."""
+    mock_pca = MagicMock()
+
+    # Mock successful token response
+    mock_token_response = {
+        "access_token": "test-access-token-12345",
+        "token_type": "Bearer",
+        "expires_in": 3600,
+    }
+
+    mock_pca.get_accounts.return_value = []
+    mock_pca.acquire_token_interactive.return_value = mock_token_response
+    mock_pca.acquire_token_silent.return_value = mock_token_response
+
+    return mock_pca
 
 
 @pytest.fixture
-def invoice_fixture_raw() -> dict[str, Any]:
-    return _load_fixture("analyze_invoice_result.json")
+def mock_activity() -> MagicMock:
+    """Mock Activity for testing."""
+    mock_activity = MagicMock()
+    mock_activity.text = "Test response"
+    mock_activity.type = "message"
+    mock_activity.id = "test-activity-id"
+    mock_activity.from_property.name = "Test Bot"
+    return mock_activity
 
 
 @pytest.fixture
-def invoice_analysis_result(invoice_fixture_raw: dict[str, Any]) -> AnalysisResult:
-    return AnalysisResult(invoice_fixture_raw)
-
-
-@pytest.fixture
-def video_fixture_raw() -> dict[str, Any]:
-    return _load_fixture("analyze_video_result.json")
-
-
-@pytest.fixture
-def video_analysis_result(video_fixture_raw: dict[str, Any]) -> AnalysisResult:
-    return AnalysisResult(video_fixture_raw)
-
-
-@pytest.fixture
-def image_fixture_raw() -> dict[str, Any]:
-    return _load_fixture("analyze_image_result.json")
-
-
-@pytest.fixture
-def image_analysis_result(image_fixture_raw: dict[str, Any]) -> AnalysisResult:
-    return AnalysisResult(image_fixture_raw)
-
-
-@pytest.fixture
-def mock_cu_client() -> AsyncMock:
-    """Create a mock ContentUnderstandingClient."""
-    client = AsyncMock()
-    client.close = AsyncMock()
-    return client
-
-
-def make_mock_poller(result: AnalysisResult) -> AsyncMock:
-    """Create a mock poller that returns the given result immediately."""
-    poller = AsyncMock()
-    poller.result = AsyncMock(return_value=result)
-    poller.continuation_token = MagicMock(return_value="mock_continuation_token")
-    poller.done = MagicMock(return_value=True)
-    return poller
-
-
-def make_slow_poller(result: AnalysisResult, delay: float = 10.0) -> MagicMock:
-    """Create a mock poller that simulates a timeout then eventually returns."""
-    poller = MagicMock()
-
-    async def slow_result() -> AnalysisResult:
-        await asyncio.sleep(delay)
-        return result
-
-    poller.result = slow_result
-    poller.continuation_token = MagicMock(return_value="mock_slow_continuation_token")
-    poller.done = MagicMock(return_value=False)
-    return poller
-
-
-def make_failing_poller(error: Exception) -> AsyncMock:
-    """Create a mock poller that raises an exception."""
-    poller = AsyncMock()
-    poller.result = AsyncMock(side_effect=error)
-    return poller
+def mock_conversation() -> MagicMock:
+    """Mock conversation for testing."""
+    mock_conversation = MagicMock()
+    mock_conversation.id = "test-conversation-id"
+    return mock_conversation

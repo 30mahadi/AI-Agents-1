@@ -1,30 +1,28 @@
-# Azure Cosmos DB Package (agent-framework-azure-cosmos)
+# Claude Package (agent-framework-claude)
 
-Azure Cosmos DB history provider integration for Agent Framework.
+Integration with Anthropic Claude as a managed agent (Claude Agent SDK).
 
 ## Main Classes
 
-- **`CosmosHistoryProvider`** - Persistent conversation history storage backed by Azure Cosmos DB
+- **`ClaudeAgent`** - Agent using Claude's native agent capabilities
+- **`ClaudeAgentOptions`** - Options for Claude agent configuration
+- **`ClaudeAgentSettings`** - Pydantic settings for configuration
 
 ## Usage
 
 ```python
-from agent_framework.azure import CosmosHistoryProvider
+from agent_framework_claude import ClaudeAgent
 
-provider = CosmosHistoryProvider(
-    endpoint="https://<account>.documents.azure.com:443/",
-    credential="<key-or-token-credential>",
-    database_name="agent-framework",
-    container_name="chat-history",
-)
+agent = ClaudeAgent(...)
+response = await agent.run("Hello")
 ```
-
-Container name is configured on the provider. `session_id` is used as the partition key.
 
 ## Import Path
 
 ```python
-from agent_framework.azure import CosmosHistoryProvider
-# or directly:
-from agent_framework_azure_cosmos import CosmosHistoryProvider
+from agent_framework_claude import ClaudeAgent
 ```
+
+## Note
+
+This package is for Claude's managed agent functionality. For basic Claude chat, use `agent-framework-anthropic` instead.
