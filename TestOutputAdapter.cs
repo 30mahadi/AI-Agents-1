@@ -6,7 +6,7 @@ using System.IO;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
-namespace Microsoft.Agents.AI.Workflows.Declarative.IntegrationTests.Framework;
+namespace Microsoft.Agents.AI.Workflows.Declarative.UnitTests;
 
 public sealed class TestOutputAdapter(ITestOutputHelper output) : TextWriter, ILogger, ILoggerFactory
 {
